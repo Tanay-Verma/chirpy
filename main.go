@@ -23,9 +23,12 @@ func main() {
 		"/app/",
 		config.middlewareMetricsInc(http.StripPrefix("/app", http.FileServer(http.Dir(filepathRoot)))),
 	)
+
 	mux.HandleFunc("GET /api/healthz", handlerReadiness)
-	mux.HandleFunc("GET /api/metrics", config.handlerMetrics)
-	mux.HandleFunc("POST /api/reset", config.handlerReset)
+	mux.HandleFunc("POST /api/validate_chirp", handlerValidateChirp)
+
+	mux.HandleFunc("GET /admin/metrics", config.handlerMetrics)
+	mux.HandleFunc("POST /admin/reset", config.handlerReset)
 
 	server := http.Server{
 		Handler: mux,
