@@ -15,6 +15,7 @@ import (
 type apiConfig struct {
 	db             *database.Queries
 	platform       string
+	jwtSecret      string
 	fileserverHits atomic.Int32
 }
 
@@ -25,9 +26,15 @@ func main() {
 	if dbURL == "" {
 		log.Fatal("DB_URL must be set")
 	}
+
 	platform := os.Getenv("PLATFORM")
 	if platform == "" {
 		log.Fatal("DB_URL must be set")
+	}
+
+	jwtSecret := os.Getenv("JWT_SECRET")
+	if jwtSecret == "" {
+		log.Fatal("JWT_SECRET must be set")
 	}
 
 	db, err := sql.Open("postgres", dbURL)

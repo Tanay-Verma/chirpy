@@ -3,14 +3,21 @@ package main
 import (
 	"encoding/json"
 	"net/http"
+	"time"
 
 	"github.com/Tanay-Verma/chirpy/internal/auth"
 )
 
 func (cfg *apiConfig) handlerLogin(w http.ResponseWriter, req *http.Request) {
 	type parameters struct {
-		Email    string `json:"email"`
-		Password string `json:"password"`
+		Email            string `json:"email"`
+		Password         string `json:"password"`
+		ExpiresInSeconds int    `json:"expired_in_seconds"`
+	}
+	type response struct {
+		Token        string `json:"token"`
+		RefreshToken string `json:"refresh_token"`
+		User
 	}
 
 	decoder := json.NewDecoder(req.Body)
@@ -30,10 +37,24 @@ func (cfg *apiConfig) handlerLogin(w http.ResponseWriter, req *http.Request) {
 		respondWithError(w, http.StatusUnauthorized, "Password does not match please try again...", err)
 	}
 
-	respondWithJSON(w, http.StatusOK, User{
-		ID:        user.ID,
-		CreatedAt: user.CreatedAt,
-		UpdatedAt: user.UpdatedAt,
-		Email:     user.Email,
+	expiresIn := time.Hour
+	if params.ExpiresInSeconds > 0 && params.ExpiresInSeconds < 3600 {
+		expiresIn = time.Duration(params.ExpiresInSeconds) * time.Second
+	}
+
+	jwtToken, err := auth.MakeJWT(user.ID, cfg.jwtSecret, expiresIn)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Couldn't generate JWT token", err)
+		return
+	}
+
+	respondWithJSON(w, http.StatusOK, response{
+		User: User{
+			ID:        user.ID,
+			CreatedAt: user.CreatedAt,
+			UpdatedAt: user.UpdatedAt,
+			Email:     user.Email,
+		},
+		Token: jwtToken,
 	})
 }

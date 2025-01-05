@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/Tanay-Verma/chirpy/internal/auth"
 	"github.com/Tanay-Verma/chirpy/internal/database"
 	"github.com/google/uuid"
 )
@@ -20,8 +21,19 @@ type Chirp struct {
 
 func (cfg *apiConfig) handlerCreateChirp(w http.ResponseWriter, req *http.Request) {
 	type parameters struct {
-		Body   string    `json:"body"`
-		UserID uuid.UUID `json:"user_id"`
+		Body string `json:"body"`
+	}
+
+	token, err := auth.GetBearerToken(req.Header)
+	if err != nil {
+		respondWithError(w, http.StatusUnauthorized, "Couldn't find JWT", err)
+		return
+	}
+
+	userID, err := auth.ValidateJWT(token, cfg.jwtSecret)
+	if err != nil {
+		respondWithError(w, http.StatusUnauthorized, "Couldn't validate JWT", err)
+		return
 	}
 
 	decoder := json.NewDecoder(req.Body)
@@ -39,7 +51,7 @@ func (cfg *apiConfig) handlerCreateChirp(w http.ResponseWriter, req *http.Reques
 
 	newChirp, err := cfg.db.CreateChirp(req.Context(), database.CreateChirpParams{
 		Body:   cleaned,
-		UserID: params.UserID,
+		UserID: userID,
 	})
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Couldn't create the chirp", err)
