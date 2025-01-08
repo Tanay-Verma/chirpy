@@ -6,13 +6,15 @@ import (
 	"time"
 
 	"github.com/Tanay-Verma/chirpy/internal/auth"
+	"github.com/Tanay-Verma/chirpy/internal/database"
 )
+
+const expiresIn = time.Hour
 
 func (cfg *apiConfig) handlerLogin(w http.ResponseWriter, req *http.Request) {
 	type parameters struct {
-		Email            string `json:"email"`
-		Password         string `json:"password"`
-		ExpiresInSeconds int    `json:"expired_in_seconds"`
+		Email    string `json:"email"`
+		Password string `json:"password"`
 	}
 	type response struct {
 		Token        string `json:"token"`
@@ -37,24 +39,38 @@ func (cfg *apiConfig) handlerLogin(w http.ResponseWriter, req *http.Request) {
 		respondWithError(w, http.StatusUnauthorized, "Password does not match please try again...", err)
 	}
 
-	expiresIn := time.Hour
-	if params.ExpiresInSeconds > 0 && params.ExpiresInSeconds < 3600 {
-		expiresIn = time.Duration(params.ExpiresInSeconds) * time.Second
-	}
-
 	jwtToken, err := auth.MakeJWT(user.ID, cfg.jwtSecret, expiresIn)
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Couldn't generate JWT token", err)
 		return
 	}
 
+	refreshToken, err := auth.MakeRefreshToken()
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Couldn't generate refresh token", err)
+		return
+	}
+
+	const refresh_token_expiration_duration = 60 * 24 * time.Hour
+	newRefreshToken, err := cfg.db.CreateRefreshToken(req.Context(), database.CreateRefreshTokenParams{
+		Token:     refreshToken,
+		UserID:    user.ID,
+		ExpiresAt: time.Now().Add(refresh_token_expiration_duration),
+	})
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Couldn't save refresh token", err)
+		return
+	}
+
 	respondWithJSON(w, http.StatusOK, response{
 		User: User{
-			ID:        user.ID,
-			CreatedAt: user.CreatedAt,
-			UpdatedAt: user.UpdatedAt,
-			Email:     user.Email,
+			ID:          user.ID,
+			CreatedAt:   user.CreatedAt,
+			UpdatedAt:   user.UpdatedAt,
+			Email:       user.Email,
+			IsChirpyRed: user.IsChirpyRed,
 		},
-		Token: jwtToken,
+		Token:        jwtToken,
+		RefreshToken: newRefreshToken.Token,
 	})
 }
