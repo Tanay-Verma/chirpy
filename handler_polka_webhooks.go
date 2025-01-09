@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net/http"
 
+	"github.com/Tanay-Verma/chirpy/internal/auth"
 	"github.com/google/uuid"
 )
 
@@ -15,6 +16,12 @@ func (cfg *apiConfig) handlerPolkaWebhooks(w http.ResponseWriter, req *http.Requ
 		Data  struct {
 			UserID uuid.UUID `json:"user_id"`
 		} `json:"data"`
+	}
+
+	apiKey, err := auth.GetAPIKey(req.Header)
+	if err != nil || apiKey != cfg.polkaKey {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
 	}
 
 	params := parameters{}
